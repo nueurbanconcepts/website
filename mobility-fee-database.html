@@ -263,11 +263,22 @@ section{padding:6rem 0}
     </div>
   </div>
   <div class="map-legend">
-    <div class="leg-item"><div class="leg-swatch" style="background:#2a9e06;opacity:0.8"></div><span class="leg-label">Mobility Fee</span></div>
-    <div class="leg-item"><div class="leg-swatch" style="background:#e6a817;opacity:0.8"></div><span class="leg-label">Impact Fee</span></div>
-    <div class="leg-item"><div class="leg-swatch" style="background:transparent;border:2px solid #2a9e06"></div><span class="leg-label">County</span></div>
-    <div class="leg-item"><div class="leg-swatch" style="background:#2a9e06;border-radius:50%;opacity:0.75"></div><span class="leg-label">City (Mobility Fee)</span></div>
-    <div class="leg-item"><div class="leg-swatch" style="background:#e6a817;border-radius:50%;opacity:0.75"></div><span class="leg-label">City (Impact Fee)</span></div>
+    <div class="leg-item">
+      <div class="leg-swatch" style="background:rgba(42,158,6,0.22);border:2px solid #1d7a04;border-radius:2px"></div>
+      <span class="leg-label">County — Mobility Fee</span>
+    </div>
+    <div class="leg-item">
+      <div class="leg-swatch" style="background:rgba(230,168,23,0.22);border:2px solid #b88010;border-radius:2px"></div>
+      <span class="leg-label">County — Impact Fee</span>
+    </div>
+    <div class="leg-item">
+      <div class="leg-swatch" style="background:#2a9e06;border-radius:50%;opacity:0.85"></div>
+      <span class="leg-label">City — Mobility Fee</span>
+    </div>
+    <div class="leg-item">
+      <div class="leg-swatch" style="background:#e6a817;border-radius:50%;opacity:0.85"></div>
+      <span class="leg-label">City — Impact Fee</span>
+    </div>
   </div>
 
   <div class="db-table-wrap">
@@ -348,25 +359,39 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 const countyGroup = L.layerGroup().addTo(map);
 const cityGroup   = L.layerGroup().addTo(map);
+// Always keep city markers above county polygons
+map.on('layeradd', () => { cityGroup.bringToFront(); });
 
 // layerMap: globalIdx -> { marker (Leaflet layer), feat, isPoint }
 const layerMap = new Map();
 
+function toProper(str) {
+  if (!str) return '';
+  // Words to keep lowercase unless first word
+  const minors = new Set(['of','the','and','at','in','on','for','to','a','an']);
+  return String(str).toLowerCase().split(' ').map((w, i) =>
+    (i === 0 || !minors.has(w)) ? w.charAt(0).toUpperCase() + w.slice(1) : w
+  ).join(' ');
+}
+
 function buildPopup(p) {
   const isMob = p.fee_category === 'Mobility Fee';
   const badgeCls = isMob ? 'fp-mob' : 'fp-imp';
-  const extra = p.layer === 'city' && p.county
-    ? `<tr><td>County</td><td>${p.county.charAt(0)+p.county.slice(1).toLowerCase()}</td></tr>`
+  const countyName = p.county
+    ? p.county.split(',').map(c => toProper(c.trim())).join(', ') + ' County'
+    : '';
+  const extra = p.layer === 'city' && countyName
+    ? `<tr><td>County</td><td>${countyName}</td></tr>`
     : p.layer === 'county' ? `<tr><td>FDOT District</td><td>${p.fdot_district}</td></tr>` : '';
   const link = p.schedule_url
     ? `<a href="${p.schedule_url}" target="_blank" rel="noopener">View Fee Schedule ↗</a>`
     : `<span style="color:#444;font-size:0.78rem">No schedule available</span>`;
   return `<div class="fee-popup">
-    <h4>${p.name}</h4>
+    <h4>${toProper(p.name)}</h4>
     <span class="fp-badge ${badgeCls}">${p.fee_category}</span>
     <table>
       ${extra}
-      <tr><td>Fee Name</td><td>${p.fee_name}</td></tr>
+      <tr><td>Fee Name</td><td>${toProper(p.fee_name)}</td></tr>
       <tr><td>Last Updated</td><td>${p.year || 'Unknown'}</td></tr>
     </table>${link}</div>`;
 }
@@ -474,6 +499,7 @@ function renderTable() {
     if (show && !grp.hasLayer(marker)) grp.addLayer(marker);
     else if (!show && grp.hasLayer(marker)) grp.removeLayer(marker);
   });
+  cityGroup.bringToFront();
 
   document.getElementById('dbBody').innerHTML = visible.map(({ f, i }) => {
     const p = f.properties;
@@ -548,8 +574,13 @@ async function loadData() {
 
     ALL_FEATURES = [...countiesGJ.features, ...citiesGJ.features];
 
-    // Add each feature with its true global index
-    ALL_FEATURES.forEach((feat, idx) => addFeature(feat, idx));
+    // Add counties first, then cities — ensures cities render on top
+    ALL_FEATURES.forEach((feat, idx) => {
+      if (feat.properties.layer === 'county') addFeature(feat, idx);
+    });
+    ALL_FEATURES.forEach((feat, idx) => {
+      if (feat.properties.layer === 'city') addFeature(feat, idx);
+    });
 
     renderTable();
     loader.style.display = 'none';
