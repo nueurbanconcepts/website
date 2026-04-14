@@ -3,7 +3,9 @@
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Mobility Fee Database — NUE Urban Concepts</title>
-<style>@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500&display=swap');
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;500;600;700&family=Barlow:wght@300;400;500&display=swap');
 :root{--green:#145703;--green-light:#1d7a04;--green-glow:#2a9e06;--green-muted:#0e3d02;--dark:#0d0d0d;--dark-surface:#141414;--dark-card:#1a1a1a;--dark-border:#2a2a2a;--white:#f5f5f0;--gray:#888880;--gray-light:#b0b0a8;--font-display:'Barlow Condensed',sans-serif;--font-body:'Barlow',sans-serif;--nav-height:72px;--max-width:1200px;--transition:0.25s ease}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth;font-size:16px}
@@ -122,17 +124,105 @@ section{padding:6rem 0}
 .fade-up.delay-3{animation-delay:0.45s}
 @media(max-width:900px){.nav-links{display:none}.nav-toggle{display:flex}.nav-links.open{display:flex;flex-direction:column;position:absolute;top:var(--nav-height);left:0;right:0;background:var(--dark-surface);border-bottom:1px solid var(--dark-border);padding:1rem;gap:0.25rem}.intro-grid{grid-template-columns:1fr}.intro-stats{grid-template-columns:repeat(4,1fr)}.services-strip-grid{grid-template-columns:repeat(2,1fr)}.footer-inner{grid-template-columns:1fr 1fr}.form-grid{grid-template-columns:1fr}}
 @media(max-width:600px){section{padding:4rem 0}.intro-stats{grid-template-columns:1fr 1fr}.services-strip-grid{grid-template-columns:1fr 1fr}.footer-inner{grid-template-columns:1fr}.footer-bottom{flex-direction:column;align-items:flex-start}.project-grid{grid-template-columns:1fr}}
-.db-search-bar{display:flex;gap:0.75rem;margin-bottom:2rem;flex-wrap:wrap}
-.db-search-bar input,.db-search-bar select{background:var(--dark-card);border:1px solid var(--dark-border);border-radius:3px;color:var(--white);font-family:var(--font-body);font-size:0.9rem;padding:0.6rem 1rem;outline:none;transition:border-color 0.2s;-webkit-appearance:none}
-.db-search-bar input{flex:1;min-width:200px}
-.db-search-bar input:focus,.db-search-bar select:focus{border-color:var(--green)}
-.db-table-wrap{overflow-x:auto}
-.db-table{width:100%;border-collapse:collapse;font-size:0.9rem}
-.db-table th{font-family:var(--font-display);font-size:0.75rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--green-glow);text-align:left;padding:0.75rem 1rem;border-bottom:1px solid var(--dark-border);white-space:nowrap}
-.db-table td{padding:0.85rem 1rem;border-bottom:1px solid var(--dark-border);color:var(--gray-light);vertical-align:top}
-.db-table tr:hover td{background:var(--dark-card)}
-.db-table .city-name{color:var(--white)}
-.db-badge{display:inline-block;font-family:var(--font-display);font-size:0.7rem;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;padding:0.2rem 0.6rem;border-radius:2px;background:rgba(20,87,3,0.25);color:var(--green-glow)}
+
+
+/* ── Controls ── */
+.db-controls {
+  display:flex; gap:0.75rem; flex-wrap:wrap; align-items:center;
+  padding:1.25rem 0; border-bottom:1px solid var(--dark-border);
+}
+.db-controls input {
+  flex:1; min-width:200px; background:var(--dark-card); border:1px solid var(--dark-border);
+  border-radius:3px; color:var(--white); font-family:var(--font-body);
+  font-size:0.9rem; padding:0.55rem 1rem; outline:none; transition:border-color 0.2s;
+}
+.db-controls input:focus { border-color:var(--green); }
+.filter-btn {
+  font-family:var(--font-display); font-size:0.78rem; font-weight:600;
+  letter-spacing:0.1em; text-transform:uppercase; padding:0.5rem 1rem;
+  border-radius:3px; cursor:pointer; border:1px solid var(--dark-border);
+  background:transparent; color:var(--gray); transition:all 0.2s; white-space:nowrap;
+}
+.filter-btn.active       { border-color:var(--green); color:var(--green-glow); background:rgba(20,87,3,0.15); }
+.filter-btn.active-mob   { border-color:#2a9e06; color:#2a9e06; background:rgba(42,158,6,0.12); }
+.filter-btn.active-imp   { border-color:#e6a817; color:#e6a817; background:rgba(230,168,23,0.12); }
+.layer-toggle { display:flex; gap:0.4rem; }
+.layer-btn {
+  font-family:var(--font-display); font-size:0.75rem; font-weight:600;
+  letter-spacing:0.08em; text-transform:uppercase; padding:0.45rem 0.85rem;
+  border-radius:3px; cursor:pointer; border:1px solid var(--dark-border);
+  background:transparent; color:var(--gray); transition:all 0.2s;
+}
+.layer-btn.active { border-color:var(--green); color:var(--green-glow); background:rgba(20,87,3,0.15); }
+
+/* ── Map ── */
+#map { width:100%; height:520px; border-radius:4px 4px 0 0; border:1px solid var(--dark-border); margin-top:1.5rem; position:relative; }
+.map-loading {
+  position:absolute; inset:0; background:var(--dark-card); border-radius:4px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:1rem; z-index:999;
+}
+.map-loading-spinner {
+  width:36px; height:36px; border:3px solid var(--dark-border);
+  border-top-color:var(--green-glow); border-radius:50%;
+  animation:spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+.map-loading p { font-family:var(--font-display); font-size:0.8rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--gray); }
+.leaflet-container { background:#0d0d0d !important; }
+.leaflet-tile { filter:brightness(0.3) saturate(0.3); }
+
+/* ── Popup ── */
+.fee-popup { min-width:230px; }
+.fee-popup h4 { font-family:'Barlow Condensed',sans-serif; font-size:1.15rem; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color:#f5f5f0; margin-bottom:0.5rem; }
+.fee-popup .fp-badge { display:inline-block; font-size:0.68rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; padding:0.15rem 0.55rem; border-radius:2px; margin-bottom:0.75rem; }
+.fp-mob { background:rgba(42,158,6,0.25); color:#2a9e06; }
+.fp-imp { background:rgba(230,168,23,0.2);  color:#e6a817; }
+.fee-popup table { width:100%; font-size:0.82rem; border-collapse:collapse; }
+.fee-popup td { padding:3px 0; vertical-align:top; }
+.fee-popup td:first-child { color:#888880; padding-right:10px; white-space:nowrap; }
+.fee-popup td:last-child { color:#b0b0a8; }
+.fee-popup a { color:#2a9e06; font-size:0.8rem; display:inline-block; margin-top:0.6rem; }
+.fee-popup a:hover { text-decoration:underline; }
+.leaflet-popup-content-wrapper { background:#1a1a1a!important; border:1px solid #2a2a2a!important; border-radius:4px!important; box-shadow:0 6px 24px rgba(0,0,0,0.7)!important; color:#f5f5f0!important; }
+.leaflet-popup-tip { background:#1a1a1a!important; }
+.leaflet-popup-close-button { color:#555!important; font-size:18px!important; top:8px!important; right:10px!important; }
+
+/* ── Legend ── */
+.map-legend {
+  display:flex; gap:1.5rem; flex-wrap:wrap; align-items:center;
+  padding:0.75rem 1rem; background:var(--dark-card); border:1px solid var(--dark-border);
+  border-top:none; border-radius:0 0 4px 4px; margin-bottom:2rem;
+}
+.leg-item { display:flex; align-items:center; gap:6px; }
+.leg-swatch { width:14px; height:14px; border-radius:2px; flex-shrink:0; }
+.leg-label { font-family:var(--font-display); font-size:0.72rem; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--gray-light); }
+
+/* ── Table ── */
+.db-table-wrap { overflow-x:auto; }
+.db-table { width:100%; border-collapse:collapse; font-size:0.88rem; }
+.db-table th {
+  font-family:var(--font-display); font-size:0.72rem; font-weight:600;
+  letter-spacing:0.1em; text-transform:uppercase; color:var(--green-glow);
+  text-align:left; padding:0.7rem 1rem; border-bottom:1px solid var(--dark-border);
+  white-space:nowrap; cursor:pointer; user-select:none;
+}
+.db-table th:hover { color:var(--white); }
+.db-table th.sort-asc::after  { content:' ▲'; font-size:0.6rem; }
+.db-table th.sort-desc::after { content:' ▼'; font-size:0.6rem; }
+.db-table td { padding:0.75rem 1rem; border-bottom:1px solid var(--dark-border); color:var(--gray-light); vertical-align:middle; }
+.db-table tr { cursor:pointer; transition:background 0.15s; }
+.db-table tr:hover td { background:rgba(255,255,255,0.03); }
+.db-table tr.highlighted td { background:rgba(20,87,3,0.18)!important; }
+.col-name { color:var(--white); }
+.db-badge { display:inline-block; font-family:var(--font-display); font-size:0.68rem; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; padding:0.18rem 0.55rem; border-radius:2px; }
+.badge-county { background:rgba(42,100,200,0.2); color:#6a9fe8; }
+.badge-city   { background:rgba(150,80,200,0.2);  color:#b87ee8; }
+.db-fee-link { color:var(--green-glow); font-size:0.8rem; text-decoration:none; }
+.db-fee-link:hover { text-decoration:underline; }
+.db-count { font-family:var(--font-display); font-size:0.78rem; color:var(--gray); margin-top:0.75rem; }
+
+@media(max-width:700px){ #map{height:360px} .db-controls{flex-direction:column;align-items:stretch} }
 </style>
 </head>
 <body>
@@ -146,42 +236,62 @@ section{padding:6rem 0}
     <li><a href="contact.html" class="nav-cta">Contact Us</a></li>
   </ul>
 </div></nav>
+
 <header class="page-header"><div class="container">
   <span class="section-label fade-up">Resource</span>
   <h1 class="fade-up delay-1">Mobility Fee Database</h1><div class="divider"></div>
-  <p class="fade-up delay-2">A comprehensive reference of mobility fee rates, programs, and adoption dates across Florida municipalities. Updated regularly by the NUE Urban Concepts team.</p>
+  <p class="fade-up delay-2">An interactive map and searchable database of mobility fees and transportation impact fees across Florida counties and municipalities. Click any boundary to explore details, or use the table below to browse and sort.</p>
 </div></header>
+
 <section><div class="container">
-  <div class="db-search-bar">
-    <input type="text" id="dbSearch" placeholder="Search by city, county, or region…">
-    <select id="dbFilter">
-      <option value="">All Types</option>
-      <option value="mobility fee">Mobility Fee</option>
-      <option value="impact fee">Impact Fee</option>
-      <option value="parking">Parking</option>
-    </select>
+
+  <div class="db-controls">
+    <input type="text" id="dbSearch" placeholder="Search jurisdiction, county, or fee name…">
+    <button class="filter-btn active" data-cat="all">All Types</button>
+    <button class="filter-btn" data-cat="Mobility Fee">Mobility Fee</button>
+    <button class="filter-btn" data-cat="Impact Fee">Impact Fee</button>
+    <div class="layer-toggle">
+      <button class="layer-btn active" data-layer="county">Counties</button>
+      <button class="layer-btn active" data-layer="city">Cities</button>
+    </div>
   </div>
+
+  <div id="map">
+    <div class="map-loading" id="mapLoading">
+      <div class="map-loading-spinner"></div>
+      <p>Loading map data…</p>
+    </div>
+  </div>
+  <div class="map-legend">
+    <div class="leg-item"><div class="leg-swatch" style="background:#2a9e06;opacity:0.8"></div><span class="leg-label">Mobility Fee</span></div>
+    <div class="leg-item"><div class="leg-swatch" style="background:#e6a817;opacity:0.8"></div><span class="leg-label">Impact Fee</span></div>
+    <div class="leg-item"><div class="leg-swatch" style="background:transparent;border:2px solid #2a9e06"></div><span class="leg-label">County</span></div>
+    <div class="leg-item"><div class="leg-swatch" style="background:transparent;border:2px dashed #6a6a6a"></div><span class="leg-label">City</span></div>
+  </div>
+
   <div class="db-table-wrap">
-    <table class="db-table">
-      <thead><tr><th>Jurisdiction</th><th>Type</th><th>Region</th><th>Status</th><th>Notes</th></tr></thead>
-      <tbody id="dbBody">
-        <tr><td class="city-name">Alachua County</td><td><span class="db-badge">Impact Fee</span></td><td>North Central FL</td><td>Active</td><td>Update completed 2023</td></tr>
-        <tr><td class="city-name">City of St. Augustine</td><td><span class="db-badge">Mobility Fee</span></td><td>Northeast FL</td><td>Active</td><td>Implementation ongoing</td></tr>
-        <tr><td class="city-name">City of Longwood</td><td><span class="db-badge">Mobility Fee</span></td><td>Central FL</td><td>Active</td><td>Plan &amp; fee adopted</td></tr>
-        <tr><td class="city-name">City of Oviedo</td><td><span class="db-badge">Mobility Fee</span></td><td>Central FL</td><td>Active</td><td>Plan &amp; fee adopted</td></tr>
-        <tr><td class="city-name">Village of Indiantown</td><td><span class="db-badge">Mobility Fee</span></td><td>Southeast FL</td><td>Active</td><td>Plan &amp; fee adopted</td></tr>
-        <tr><td class="city-name">City of Palm Beach Gardens</td><td><span class="db-badge">Mobility Fee</span></td><td>Southeast FL</td><td>Active</td><td>Updated 2023</td></tr>
-        <tr><td class="city-name">Okaloosa County</td><td><span class="db-badge">Mobility Fee</span></td><td>Panhandle</td><td>Active</td><td>County-wide plan</td></tr>
-        <tr><td class="city-name">City of Cape Coral</td><td><span class="db-badge">Parking</span></td><td>Southwest FL</td><td>Active</td><td>South Cape Downtown</td></tr>
-        <tr><td class="city-name">Palm Beach Gardens</td><td><span class="db-badge">Impact Fee</span></td><td>Southeast FL</td><td>Active</td><td>Impact fee update</td></tr>
-      </tbody>
+    <table class="db-table" id="dbTable">
+      <thead><tr>
+        <th data-col="name">Jurisdiction</th>
+        <th data-col="layer">Type</th>
+        <th data-col="county">County / District</th>
+        <th data-col="fee_name">Fee Name</th>
+        <th data-col="fee_category">Category</th>
+        <th data-col="year">Year Updated</th>
+        <th>Fee Schedule</th>
+      </tr></thead>
+      <tbody id="dbBody"><tr><td colspan="7" style="text-align:center;color:var(--gray);padding:2rem">Loading data…</td></tr></tbody>
     </table>
+    <div class="db-count" id="dbCount"></div>
   </div>
-  <div style="margin-top:2rem;padding:1.5rem;background:var(--dark-card);border:1px solid var(--dark-border);border-radius:4px;display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap">
-    <p style="font-size:0.88rem;color:var(--gray);flex:1">This database is actively maintained and expanded. Know of a jurisdiction that should be included?</p>
+
+  <div style="margin-top:1.5rem;padding:1.25rem 1.5rem;background:var(--dark-card);border:1px solid var(--dark-border);border-radius:4px;display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap">
+    <p style="font-size:0.88rem;color:var(--gray);flex:1">Data is actively maintained. Know of a jurisdiction missing from this database?</p>
     <a href="contact.html" class="btn btn-outline" style="white-space:nowrap">Submit a Record</a>
   </div>
+
 </div></section>
+
 <footer class="site-footer"><div class="container">
   <div class="footer-inner">
     <div class="footer-brand"><img src="images/logo-white.png" alt="NUE Urban Concepts"><p>Improving quality of life in cities through planning, mobility, and smart urban design.</p></div>
@@ -190,29 +300,257 @@ section{padding:6rem 0}
       <li><a href="innovation.html">Innovation</a></li><li><a href="mobility-cohort.html">Mobility Cohort</a></li>
       <li><a href="mobility-fee-database.html">Mobility Fee Database</a></li><li><a href="contact.html">Contact Us</a></li>
     </ul></div>
-    <div class="footer-col"><h5>Contact</h5><address><strong style="color:var(--gray-light);font-style:normal">North Central Florida</strong><br>747 SW 2nd Ave IMB 28, Suite 190<br>Gainesville, FL 32601<br><br>O: 833.NUC.8484<br>C: 352.363.0614</address></div>
+    <div class="footer-col"><h5>Contact</h5><address>
+      <strong style="color:var(--gray-light);font-style:normal">North Central Florida</strong><br>
+      747 SW 2nd Ave IMB 28, Suite 190<br>Gainesville, FL 32601<br><br>O: 833.NUC.8484<br>C: 352.363.0614
+    </address></div>
   </div>
   <div class="footer-bottom"><p>&copy; <span id="year"></span> NUE Urban Concepts. All rights reserved.</p><p>Land Use · Mobility · Parking · Fees</p></div>
 </div></footer>
-<script>document.addEventListener('DOMContentLoaded',()=>{
-  const page=window.location.pathname.split('/').pop()||'index.html';
-  document.querySelectorAll('.nav-links a').forEach(a=>{if(a.getAttribute('href')===page)a.classList.add('active')});
-  const toggle=document.querySelector('.nav-toggle');
-  const nav=document.querySelector('.nav-links');
-  if(toggle&&nav){
-    toggle.addEventListener('click',()=>{toggle.classList.toggle('open');nav.classList.toggle('open')});
-    nav.querySelectorAll('a').forEach(a=>a.addEventListener('click',()=>{toggle.classList.remove('open');nav.classList.remove('open')}));
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+document.getElementById('year').textContent = new Date().getFullYear();
+
+// Nav active state
+const page = window.location.pathname.split('/').pop() || 'index.html';
+document.querySelectorAll('.nav-links a').forEach(a => { if(a.getAttribute('href')===page) a.classList.add('active'); });
+const toggle = document.querySelector('.nav-toggle'), nav = document.querySelector('.nav-links');
+if(toggle&&nav){ toggle.addEventListener('click',()=>{ toggle.classList.toggle('open'); nav.classList.toggle('open'); }); }
+
+// ── State ──────────────────────────────────────────────────────────
+let ALL_FEATURES = [];
+let activeFilter = 'all';
+let activeLayers = { county: true, city: true };
+let sortCol = 'name', sortDir = 'asc';
+let highlightedRow = null, highlightedMapLayer = null, highlightedFeat = null;
+
+// ── Colors ─────────────────────────────────────────────────────────
+const COLORS = {
+  'Mobility Fee': { fill:'#2a9e06', stroke:'#1d7a04' },
+  'Impact Fee':   { fill:'#e6a817', stroke:'#b88010' }
+};
+function styleFor(feat, highlighted) {
+  const c = COLORS[feat.properties.fee_category] || {fill:'#888',stroke:'#555'};
+  const isCity = feat.properties.layer === 'city';
+  return {
+    fillColor: c.fill,
+    fillOpacity: highlighted ? 0.55 : 0.2,
+    color: highlighted ? c.fill : c.stroke,
+    weight: highlighted ? 3 : (isCity ? 1.5 : 2),
+    dashArray: isCity ? '5,4' : null,
+    opacity: highlighted ? 1 : 0.8
+  };
+}
+
+// ── Map setup ──────────────────────────────────────────────────────
+const map = L.map('map', { center:[27.8,-83.5], zoom:6, minZoom:5, maxZoom:14 });
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution:'© OpenStreetMap contributors', maxZoom:19
+}).addTo(map);
+
+const countyGroup = L.layerGroup().addTo(map);
+const cityGroup   = L.layerGroup().addTo(map);
+const layerMap    = new Map(); // idx -> { geoLayer, feat }
+
+function buildPopup(p) {
+  const badgeCls = p.fee_category === 'Mobility Fee' ? 'fp-mob' : 'fp-imp';
+  const countyRow = p.layer==='city' && p.county
+    ? `<tr><td>County</td><td>${p.county.charAt(0)+p.county.slice(1).toLowerCase()}</td></tr>` : '';
+  const distRow = p.layer==='county'
+    ? `<tr><td>FDOT District</td><td>${p.fdot_district}</td></tr>` : '';
+  const schedLink = p.schedule_url
+    ? `<a href="${p.schedule_url}" target="_blank" rel="noopener">View Fee Schedule ↗</a>`
+    : `<span style="color:#444;font-size:0.78rem">No schedule available</span>`;
+  return `<div class="fee-popup">
+    <h4>${p.name}</h4>
+    <span class="fp-badge ${badgeCls}">${p.fee_category}</span>
+    <table>
+      ${countyRow}${distRow}
+      <tr><td>Fee Name</td><td>${p.fee_name}</td></tr>
+      <tr><td>Last Updated</td><td>${p.year || 'Unknown'}</td></tr>
+    </table>
+    ${schedLink}
+  </div>`;
+}
+
+function addToMap(features) {
+  features.forEach((feat, idx) => {
+    const group = feat.properties.layer === 'county' ? countyGroup : cityGroup;
+    const gl = L.geoJSON(feat, {
+      style: () => styleFor(feat, false),
+      onEachFeature: (f, l) => {
+        l.bindPopup(buildPopup(f.properties), { maxWidth:300, autoPan:true });
+        l.on('click', () => {
+          // Highlight map feature
+          highlightMapFeature(idx);
+          // Highlight table row WITHOUT scrolling to it
+          highlightTableRow(idx, false);
+        });
+        l.on('mouseover', () => { if(highlightedMapLayer!==gl) l.setStyle({fillOpacity:0.4, weight:2.5}); });
+        l.on('mouseout',  () => { if(highlightedMapLayer!==gl) l.setStyle(styleFor(feat,false)); });
+      }
+    });
+    group.addLayer(gl);
+    layerMap.set(idx, { geoLayer: gl, feat });
+  });
+}
+
+function highlightMapFeature(idx) {
+  // Reset previous
+  if(highlightedMapLayer !== null) {
+    const prev = layerMap.get([...layerMap.keys()].find(k => layerMap.get(k).geoLayer === highlightedMapLayer));
+    if(prev) prev.geoLayer.setStyle(styleFor(prev.feat, false));
   }
-  if('IntersectionObserver' in window){
-    const obs=new IntersectionObserver((entries)=>{entries.forEach(e=>{if(e.isIntersecting){e.target.style.opacity='1';e.target.style.transform='translateY(0)';obs.unobserve(e.target)}})},{threshold:0.1,rootMargin:'0px 0px -40px 0px'});
-    document.querySelectorAll('.card,.team-card,.project-card,.location-card,.stat-item').forEach((el,i)=>{el.style.opacity='0';el.style.transform='translateY(20px)';el.style.transition=`opacity 0.5s ease ${(i%6)*0.08}s,transform 0.5s ease ${(i%6)*0.08}s`;obs.observe(el)});
+  const entry = layerMap.get(idx);
+  if(!entry) return;
+  entry.geoLayer.setStyle(styleFor(entry.feat, true));
+  entry.geoLayer.bringToFront();
+  highlightedMapLayer = entry.geoLayer;
+}
+
+function highlightTableRow(idx, scrollTo) {
+  if(highlightedRow) highlightedRow.classList.remove('highlighted');
+  const row = document.querySelector(`#dbBody tr[data-idx="${idx}"]`);
+  if(row) {
+    row.classList.add('highlighted');
+    highlightedRow = row;
+    if(scrollTo) row.scrollIntoView({ behavior:'smooth', block:'nearest' });
   }
-  const form=document.getElementById('contactForm');
-  if(form){form.addEventListener('submit',e=>{e.preventDefault();const btn=form.querySelector('[type="submit"]');const orig=btn.textContent;btn.textContent='Sending…';btn.disabled=true;setTimeout(()=>{btn.textContent='Message Sent ✓';btn.style.background='#1d7a04';setTimeout(()=>{btn.textContent=orig;btn.disabled=false;btn.style.background='';form.reset()},3000)},1200)})}
-  document.getElementById('year').textContent=new Date().getFullYear();
+}
+
+// Called when clicking a table row — zoom map, NO table scroll
+window.onRowClick = function(idx) {
+  const entry = layerMap.get(idx);
+  if(!entry) return;
+  highlightMapFeature(idx);
+  highlightTableRow(idx, false);
+  try {
+    const bounds = entry.geoLayer.getBounds();
+    map.flyToBounds(bounds, { padding:[80,80], maxZoom:12, duration:0.7 });
+    setTimeout(() => entry.geoLayer.openPopup(), 800);
+  } catch(e) {}
+};
+
+// ── Table render ───────────────────────────────────────────────────
+function getVisible() {
+  const q = document.getElementById('dbSearch').value.toLowerCase();
+  return ALL_FEATURES.map((f,i)=>({...f,_idx:i})).filter(f => {
+    const p = f.properties;
+    if(!activeLayers[p.layer]) return false;
+    if(activeFilter!=='all' && p.fee_category!==activeFilter) return false;
+    if(q) {
+      const txt = [p.name,p.fee_name,p.fee_category,p.county||'',String(p.fdot_district||''),String(p.year||'')].join(' ').toLowerCase();
+      if(!txt.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function renderTable() {
+  let data = getVisible();
+  data.sort((a,b) => {
+    let av = a.properties[sortCol] ?? '', bv = b.properties[sortCol] ?? '';
+    if(typeof av==='string') av=av.toLowerCase();
+    if(typeof bv==='string') bv=bv.toLowerCase();
+    return sortDir==='asc' ? (av<bv?-1:av>bv?1:0) : (av>bv?-1:av<bv?1:0);
+  });
+
+  const visibleIdx = new Set(data.map(f=>f._idx));
+
+  // Update map visibility
+  layerMap.forEach(({geoLayer, feat}, idx) => {
+    const grp = feat.properties.layer==='county' ? countyGroup : cityGroup;
+    const shouldShow = visibleIdx.has(idx) && activeLayers[feat.properties.layer];
+    if(shouldShow && !grp.hasLayer(geoLayer)) grp.addLayer(geoLayer);
+    else if(!shouldShow && grp.hasLayer(geoLayer)) grp.removeLayer(geoLayer);
+  });
+
+  document.getElementById('dbBody').innerHTML = data.map(f => {
+    const p = f.properties;
+    const catColor = p.fee_category==='Mobility Fee' ? '#2a9e06' : '#e6a817';
+    const layerBadge = p.layer==='county'
+      ? '<span class="db-badge badge-county">County</span>'
+      : '<span class="db-badge badge-city">City</span>';
+    const countyCol = p.layer==='city'
+      ? (p.county ? p.county.charAt(0)+p.county.slice(1).toLowerCase() : '—')
+      : `FDOT ${p.fdot_district}`;
+    const schedCell = p.schedule_url
+      ? `<a class="db-fee-link" href="${p.schedule_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View ↗</a>`
+      : '<span style="color:var(--dark-border)">—</span>';
+    return `<tr data-idx="${f._idx}" onclick="onRowClick(${f._idx})">
+      <td class="col-name">${p.name}</td>
+      <td>${layerBadge}</td>
+      <td>${countyCol}</td>
+      <td>${p.fee_name}</td>
+      <td><span style="color:${catColor};font-size:0.82rem;font-weight:500">${p.fee_category}</span></td>
+      <td>${p.year||'—'}</td>
+      <td>${schedCell}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('dbCount').textContent =
+    `Showing ${data.length} of ${ALL_FEATURES.length} jurisdictions`;
+}
+
+// ── Controls ───────────────────────────────────────────────────────
+document.getElementById('dbSearch').addEventListener('input', renderTable);
+
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active','active-mob','active-imp'));
+    activeFilter = btn.dataset.cat;
+    btn.classList.add(activeFilter==='Mobility Fee'?'active-mob':activeFilter==='Impact Fee'?'active-imp':'active');
+    renderTable();
+  });
 });
-const si=document.getElementById('dbSearch'),sf=document.getElementById('dbFilter');
-function ft(){const q=si.value.toLowerCase(),f=sf.value.toLowerCase();document.querySelectorAll('#dbBody tr').forEach(r=>{const t=r.textContent.toLowerCase(),b=r.querySelector('.db-badge')?.textContent.toLowerCase()||'';r.style.display=(!q||t.includes(q))&&(!f||b.includes(f))?'':'none'})}
-si.addEventListener('input',ft);sf.addEventListener('change',ft);
+
+document.querySelectorAll('.layer-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    activeLayers[btn.dataset.layer] = !activeLayers[btn.dataset.layer];
+    btn.classList.toggle('active', activeLayers[btn.dataset.layer]);
+    renderTable();
+  });
+});
+
+document.querySelectorAll('.db-table th[data-col]').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    sortDir = sortCol===col ? (sortDir==='asc'?'desc':'asc') : 'asc';
+    sortCol = col;
+    document.querySelectorAll('.db-table th').forEach(t=>t.classList.remove('sort-asc','sort-desc'));
+    th.classList.add(sortDir==='asc'?'sort-asc':'sort-desc');
+    renderTable();
+  });
+});
+
+// ── Load data via fetch ─────────────────────────────────────────────
+async function loadData() {
+  try {
+    const [countiesRes, citiesRes] = await Promise.all([
+      fetch('data/counties.geojson'),
+      fetch('data/cities.geojson')
+    ]);
+    const [countiesGJ, citiesGJ] = await Promise.all([
+      countiesRes.json(),
+      citiesRes.json()
+    ]);
+    ALL_FEATURES = [...countiesGJ.features, ...citiesGJ.features];
+    addToMap(ALL_FEATURES);
+    renderTable();
+    document.getElementById('mapLoading').style.display = 'none';
+  } catch(err) {
+    document.getElementById('mapLoading').innerHTML =
+      `<p style="color:var(--gray);font-family:var(--font-display);font-size:0.8rem;letter-spacing:0.1em;text-transform:uppercase;padding:2rem;text-align:center">
+        Map data unavailable.<br>Open this page from a web server or GitHub Pages.
+      </p>`;
+    document.getElementById('dbBody').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:2rem">
+        Table data unavailable — serve from a web server to load GeoJSON files.
+      </td></tr>`;
+  }
+}
+
+loadData();
 </script>
 </body></html>
