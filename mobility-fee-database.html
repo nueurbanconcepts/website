@@ -266,7 +266,8 @@ section{padding:6rem 0}
     <div class="leg-item"><div class="leg-swatch" style="background:#2a9e06;opacity:0.8"></div><span class="leg-label">Mobility Fee</span></div>
     <div class="leg-item"><div class="leg-swatch" style="background:#e6a817;opacity:0.8"></div><span class="leg-label">Impact Fee</span></div>
     <div class="leg-item"><div class="leg-swatch" style="background:transparent;border:2px solid #2a9e06"></div><span class="leg-label">County</span></div>
-    <div class="leg-item"><div class="leg-swatch" style="background:transparent;border:2px dashed #6a6a6a"></div><span class="leg-label">City</span></div>
+    <div class="leg-item"><div class="leg-swatch" style="background:#2a9e06;border-radius:50%;opacity:0.75"></div><span class="leg-label">City (Mobility Fee)</span></div>
+    <div class="leg-item"><div class="leg-swatch" style="background:#e6a817;border-radius:50%;opacity:0.75"></div><span class="leg-label">City (Impact Fee)</span></div>
   </div>
 
   <div class="db-table-wrap">
@@ -332,14 +333,23 @@ const COLORS = {
 };
 function styleFor(feat, highlighted) {
   const c = COLORS[feat.properties.fee_category] || {fill:'#888',stroke:'#555'};
-  const isCity = feat.properties.layer === 'city';
   return {
     fillColor: c.fill,
-    fillOpacity: highlighted ? 0.55 : 0.2,
+    fillOpacity: highlighted ? 0.7 : 0.25,
     color: highlighted ? c.fill : c.stroke,
-    weight: highlighted ? 3 : (isCity ? 1.5 : 2),
-    dashArray: isCity ? '5,4' : null,
-    opacity: highlighted ? 1 : 0.8
+    weight: highlighted ? 3 : 2,
+    opacity: highlighted ? 1 : 0.85
+  };
+}
+function circleStyle(feat, highlighted) {
+  const c = COLORS[feat.properties.fee_category] || {fill:'#888',stroke:'#555'};
+  return {
+    radius: highlighted ? 10 : 7,
+    fillColor: c.fill,
+    fillOpacity: highlighted ? 0.9 : 0.75,
+    color: highlighted ? '#fff' : c.stroke,
+    weight: highlighted ? 2 : 1.5,
+    opacity: 1
   };
 }
 
@@ -377,35 +387,52 @@ function buildPopup(p) {
 function addToMap(features) {
   features.forEach((feat, idx) => {
     const group = feat.properties.layer === 'county' ? countyGroup : cityGroup;
-    const gl = L.geoJSON(feat, {
-      style: () => styleFor(feat, false),
-      onEachFeature: (f, l) => {
-        l.bindPopup(buildPopup(f.properties), { maxWidth:300, autoPan:true });
-        l.on('click', () => {
-          // Highlight map feature
-          highlightMapFeature(idx);
-          // Highlight table row WITHOUT scrolling to it
-          highlightTableRow(idx, false);
-        });
-        l.on('mouseover', () => { if(highlightedMapLayer!==gl) l.setStyle({fillOpacity:0.4, weight:2.5}); });
-        l.on('mouseout',  () => { if(highlightedMapLayer!==gl) l.setStyle(styleFor(feat,false)); });
-      }
-    });
+    const isPoint = feat.geometry.type === 'Point';
+    let gl;
+    if (isPoint) {
+      // City: render as circle marker
+      const coords = feat.geometry.coordinates;
+      gl = L.circleMarker([coords[1], coords[0]], circleStyle(feat, false));
+      gl.bindPopup(buildPopup(feat.properties), { maxWidth:300, autoPan:true });
+      gl.on('click', () => {
+        highlightMapFeature(idx);
+        highlightTableRow(idx, false);
+      });
+      gl.on('mouseover', () => { if(highlightedMapLayer!==gl) gl.setStyle({fillOpacity:0.95, radius:9}); });
+      gl.on('mouseout',  () => { if(highlightedMapLayer!==gl) gl.setStyle(circleStyle(feat,false)); });
+    } else {
+      // County: render as polygon
+      gl = L.geoJSON(feat, {
+        style: () => styleFor(feat, false),
+        onEachFeature: (f, l) => {
+          l.bindPopup(buildPopup(f.properties), { maxWidth:300, autoPan:true });
+          l.on('click', () => {
+            highlightMapFeature(idx);
+            highlightTableRow(idx, false);
+          });
+          l.on('mouseover', () => { if(highlightedMapLayer!==gl) l.setStyle({fillOpacity:0.4, weight:2.5}); });
+          l.on('mouseout',  () => { if(highlightedMapLayer!==gl) l.setStyle(styleFor(feat,false)); });
+        }
+      });
+    }
     group.addLayer(gl);
-    layerMap.set(idx, { geoLayer: gl, feat });
+    layerMap.set(idx, { geoLayer: gl, feat, isPoint });
   });
 }
 
 function highlightMapFeature(idx) {
-  // Reset previous
+  // Reset previous highlight
   if(highlightedMapLayer !== null) {
-    const prev = layerMap.get([...layerMap.keys()].find(k => layerMap.get(k).geoLayer === highlightedMapLayer));
-    if(prev) prev.geoLayer.setStyle(styleFor(prev.feat, false));
+    const prevEntry = [...layerMap.values()].find(v => v.geoLayer === highlightedMapLayer);
+    if(prevEntry) {
+      if(prevEntry.isPoint) prevEntry.geoLayer.setStyle(circleStyle(prevEntry.feat, false));
+      else prevEntry.geoLayer.setStyle(styleFor(prevEntry.feat, false));
+    }
   }
   const entry = layerMap.get(idx);
   if(!entry) return;
-  entry.geoLayer.setStyle(styleFor(entry.feat, true));
-  entry.geoLayer.bringToFront();
+  if(entry.isPoint) entry.geoLayer.setStyle(circleStyle(entry.feat, true));
+  else { entry.geoLayer.setStyle(styleFor(entry.feat, true)); entry.geoLayer.bringToFront(); }
   highlightedMapLayer = entry.geoLayer;
 }
 
@@ -426,9 +453,15 @@ window.onRowClick = function(idx) {
   highlightMapFeature(idx);
   highlightTableRow(idx, false);
   try {
-    const bounds = entry.geoLayer.getBounds();
-    map.flyToBounds(bounds, { padding:[80,80], maxZoom:12, duration:0.7 });
-    setTimeout(() => entry.geoLayer.openPopup(), 800);
+    if(entry.isPoint) {
+      const coords = entry.feat.geometry.coordinates;
+      map.flyTo([coords[1], coords[0]], 12, { duration:0.7 });
+      setTimeout(() => entry.geoLayer.openPopup(), 800);
+    } else {
+      const bounds = entry.geoLayer.getBounds();
+      map.flyToBounds(bounds, { padding:[80,80], maxZoom:12, duration:0.7 });
+      setTimeout(() => entry.geoLayer.openPopup && entry.geoLayer.eachLayer(l=>l.openPopup()), 800);
+    }
   } catch(e) {}
 };
 
