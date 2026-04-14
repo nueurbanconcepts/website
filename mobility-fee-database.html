@@ -324,206 +324,182 @@ let ALL_FEATURES = [];
 let activeFilter = 'all';
 let activeLayers = { county: true, city: true };
 let sortCol = 'name', sortDir = 'asc';
-let highlightedRow = null, highlightedMapLayer = null, highlightedFeat = null;
+let highlightedRow = null;
+let highlightedIdx = null;
 
 // ── Colors ─────────────────────────────────────────────────────────
 const COLORS = {
   'Mobility Fee': { fill:'#2a9e06', stroke:'#1d7a04' },
   'Impact Fee':   { fill:'#e6a817', stroke:'#b88010' }
 };
-function styleFor(feat, highlighted) {
+function polyStyle(feat, hl) {
   const c = COLORS[feat.properties.fee_category] || {fill:'#888',stroke:'#555'};
-  return {
-    fillColor: c.fill,
-    fillOpacity: highlighted ? 0.7 : 0.25,
-    color: highlighted ? c.fill : c.stroke,
-    weight: highlighted ? 3 : 2,
-    opacity: highlighted ? 1 : 0.85
-  };
+  return { fillColor:c.fill, fillOpacity:hl?0.55:0.22, color:hl?c.fill:c.stroke, weight:hl?3:2, opacity:hl?1:0.85 };
 }
-function circleStyle(feat, highlighted) {
+function ptStyle(feat, hl) {
   const c = COLORS[feat.properties.fee_category] || {fill:'#888',stroke:'#555'};
-  return {
-    radius: highlighted ? 10 : 7,
-    fillColor: c.fill,
-    fillOpacity: highlighted ? 0.9 : 0.75,
-    color: highlighted ? '#fff' : c.stroke,
-    weight: highlighted ? 2 : 1.5,
-    opacity: 1
-  };
+  return { radius:hl?11:7, fillColor:c.fill, fillOpacity:hl?0.95:0.8, color:hl?'#fff':c.stroke, weight:hl?2:1.5 };
 }
 
 // ── Map setup ──────────────────────────────────────────────────────
-const map = L.map('map', { center:[27.8,-83.5], zoom:6, minZoom:5, maxZoom:14 });
+const map = L.map('map', { center:[27.8,-83.5], zoom:6, minZoom:5, maxZoom:15 });
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   attribution:'© OpenStreetMap contributors', maxZoom:19
 }).addTo(map);
-
 const countyGroup = L.layerGroup().addTo(map);
 const cityGroup   = L.layerGroup().addTo(map);
-const layerMap    = new Map(); // idx -> { geoLayer, feat }
+
+// layerMap: globalIdx -> { marker (Leaflet layer), feat, isPoint }
+const layerMap = new Map();
 
 function buildPopup(p) {
-  const badgeCls = p.fee_category === 'Mobility Fee' ? 'fp-mob' : 'fp-imp';
-  const countyRow = p.layer==='city' && p.county
-    ? `<tr><td>County</td><td>${p.county.charAt(0)+p.county.slice(1).toLowerCase()}</td></tr>` : '';
-  const distRow = p.layer==='county'
-    ? `<tr><td>FDOT District</td><td>${p.fdot_district}</td></tr>` : '';
-  const schedLink = p.schedule_url
+  const isMob = p.fee_category === 'Mobility Fee';
+  const badgeCls = isMob ? 'fp-mob' : 'fp-imp';
+  const extra = p.layer === 'city' && p.county
+    ? `<tr><td>County</td><td>${p.county.charAt(0)+p.county.slice(1).toLowerCase()}</td></tr>`
+    : p.layer === 'county' ? `<tr><td>FDOT District</td><td>${p.fdot_district}</td></tr>` : '';
+  const link = p.schedule_url
     ? `<a href="${p.schedule_url}" target="_blank" rel="noopener">View Fee Schedule ↗</a>`
     : `<span style="color:#444;font-size:0.78rem">No schedule available</span>`;
   return `<div class="fee-popup">
     <h4>${p.name}</h4>
     <span class="fp-badge ${badgeCls}">${p.fee_category}</span>
     <table>
-      ${countyRow}${distRow}
+      ${extra}
       <tr><td>Fee Name</td><td>${p.fee_name}</td></tr>
       <tr><td>Last Updated</td><td>${p.year || 'Unknown'}</td></tr>
-    </table>
-    ${schedLink}
-  </div>`;
+    </table>${link}</div>`;
 }
 
-function addToMap(features) {
-  features.forEach((feat, idx) => {
-    const group = feat.properties.layer === 'county' ? countyGroup : cityGroup;
-    const isPoint = feat.geometry.type === 'Point';
-    let gl;
-    if (isPoint) {
-      // City: render as circle marker
-      const coords = feat.geometry.coordinates;
-      gl = L.circleMarker([coords[1], coords[0]], circleStyle(feat, false));
-      gl.bindPopup(buildPopup(feat.properties), { maxWidth:300, autoPan:true });
-      gl.on('click', () => {
-        highlightMapFeature(idx);
-        highlightTableRow(idx, false);
-      });
-      gl.on('mouseover', () => { if(highlightedMapLayer!==gl) gl.setStyle({fillOpacity:0.95, radius:9}); });
-      gl.on('mouseout',  () => { if(highlightedMapLayer!==gl) gl.setStyle(circleStyle(feat,false)); });
-    } else {
-      // County: render as polygon
-      gl = L.geoJSON(feat, {
-        style: () => styleFor(feat, false),
-        onEachFeature: (f, l) => {
-          l.bindPopup(buildPopup(f.properties), { maxWidth:300, autoPan:true });
-          l.on('click', () => {
-            highlightMapFeature(idx);
-            highlightTableRow(idx, false);
-          });
-          l.on('mouseover', () => { if(highlightedMapLayer!==gl) l.setStyle({fillOpacity:0.4, weight:2.5}); });
-          l.on('mouseout',  () => { if(highlightedMapLayer!==gl) l.setStyle(styleFor(feat,false)); });
-        }
-      });
-    }
-    group.addLayer(gl);
-    layerMap.set(idx, { geoLayer: gl, feat, isPoint });
-  });
-}
-
-function highlightMapFeature(idx) {
-  // Reset previous highlight
-  if(highlightedMapLayer !== null) {
-    const prevEntry = [...layerMap.values()].find(v => v.geoLayer === highlightedMapLayer);
-    if(prevEntry) {
-      if(prevEntry.isPoint) prevEntry.geoLayer.setStyle(circleStyle(prevEntry.feat, false));
-      else prevEntry.geoLayer.setStyle(styleFor(prevEntry.feat, false));
-    }
-  }
+function resetHighlight(idx) {
   const entry = layerMap.get(idx);
-  if(!entry) return;
-  if(entry.isPoint) entry.geoLayer.setStyle(circleStyle(entry.feat, true));
-  else { entry.geoLayer.setStyle(styleFor(entry.feat, true)); entry.geoLayer.bringToFront(); }
-  highlightedMapLayer = entry.geoLayer;
+  if (!entry) return;
+  if (entry.isPoint) entry.marker.setStyle(ptStyle(entry.feat, false));
+  else entry.marker.setStyle(polyStyle(entry.feat, false));
 }
-
-function highlightTableRow(idx, scrollTo) {
-  if(highlightedRow) highlightedRow.classList.remove('highlighted');
-  const row = document.querySelector(`#dbBody tr[data-idx="${idx}"]`);
-  if(row) {
-    row.classList.add('highlighted');
-    highlightedRow = row;
-    if(scrollTo) row.scrollIntoView({ behavior:'smooth', block:'nearest' });
-  }
-}
-
-// Called when clicking a table row — zoom map, NO table scroll
-window.onRowClick = function(idx) {
+function applyHighlight(idx) {
   const entry = layerMap.get(idx);
-  if(!entry) return;
-  highlightMapFeature(idx);
-  highlightTableRow(idx, false);
+  if (!entry) return;
+  if (entry.isPoint) entry.marker.setStyle(ptStyle(entry.feat, true));
+  else { entry.marker.setStyle(polyStyle(entry.feat, true)); entry.marker.bringToFront(); }
+}
+
+function onMapClick(globalIdx) {
+  if (highlightedIdx !== null && highlightedIdx !== globalIdx) resetHighlight(highlightedIdx);
+  highlightedIdx = globalIdx;
+  applyHighlight(globalIdx);
+  // Highlight table row — no scroll
+  if (highlightedRow) highlightedRow.classList.remove('highlighted');
+  const row = document.querySelector(`#dbBody tr[data-idx="${globalIdx}"]`);
+  if (row) { row.classList.add('highlighted'); highlightedRow = row; }
+}
+
+window.onRowClick = function(globalIdx) {
+  if (highlightedIdx !== null && highlightedIdx !== globalIdx) resetHighlight(highlightedIdx);
+  highlightedIdx = globalIdx;
+  applyHighlight(globalIdx);
+  // Highlight row — no scroll
+  if (highlightedRow) highlightedRow.classList.remove('highlighted');
+  const row = document.querySelector(`#dbBody tr[data-idx="${globalIdx}"]`);
+  if (row) { row.classList.add('highlighted'); highlightedRow = row; }
+  // Fly map to feature
+  const entry = layerMap.get(globalIdx);
+  if (!entry) return;
   try {
-    if(entry.isPoint) {
-      const coords = entry.feat.geometry.coordinates;
-      map.flyTo([coords[1], coords[0]], 12, { duration:0.7 });
-      setTimeout(() => entry.geoLayer.openPopup(), 800);
+    if (entry.isPoint) {
+      const c = entry.feat.geometry.coordinates;
+      map.flyTo([c[1], c[0]], 12, { duration:0.7 });
+      setTimeout(() => entry.marker.openPopup(), 750);
     } else {
-      const bounds = entry.geoLayer.getBounds();
-      map.flyToBounds(bounds, { padding:[80,80], maxZoom:12, duration:0.7 });
-      setTimeout(() => entry.geoLayer.openPopup && entry.geoLayer.eachLayer(l=>l.openPopup()), 800);
+      map.flyToBounds(entry.marker.getBounds(), { padding:[80,80], maxZoom:12, duration:0.7 });
+      setTimeout(() => entry.marker.eachLayer(l => l.openPopup && l.openPopup()), 750);
     }
   } catch(e) {}
 };
 
-// ── Table render ───────────────────────────────────────────────────
+function addFeature(feat, globalIdx) {
+  const isPoint = feat.geometry.type === 'Point';
+  const group = feat.properties.layer === 'county' ? countyGroup : cityGroup;
+  let marker;
+  if (isPoint) {
+    const [lon, lat] = feat.geometry.coordinates;
+    marker = L.circleMarker([lat, lon], ptStyle(feat, false));
+    marker.bindPopup(buildPopup(feat.properties), { maxWidth:300 });
+    marker.on('click', () => onMapClick(globalIdx));
+    marker.on('mouseover', () => { if(highlightedIdx!==globalIdx) marker.setStyle({fillOpacity:0.95,radius:9}); });
+    marker.on('mouseout',  () => { if(highlightedIdx!==globalIdx) marker.setStyle(ptStyle(feat,false)); });
+  } else {
+    marker = L.geoJSON(feat, { style: () => polyStyle(feat, false) });
+    marker.bindPopup(buildPopup(feat.properties), { maxWidth:300 });
+    marker.on('click', () => onMapClick(globalIdx));
+    marker.on('mouseover', () => { if(highlightedIdx!==globalIdx) marker.setStyle({fillOpacity:0.4,weight:2.5}); });
+    marker.on('mouseout',  () => { if(highlightedIdx!==globalIdx) marker.setStyle(polyStyle(feat,false)); });
+  }
+  group.addLayer(marker);
+  layerMap.set(globalIdx, { marker, feat, isPoint });
+}
+
+// ── Table ──────────────────────────────────────────────────────────
 function getVisible() {
   const q = document.getElementById('dbSearch').value.toLowerCase();
-  return ALL_FEATURES.map((f,i)=>({...f,_idx:i})).filter(f => {
-    const p = f.properties;
-    if(!activeLayers[p.layer]) return false;
-    if(activeFilter!=='all' && p.fee_category!==activeFilter) return false;
-    if(q) {
-      const txt = [p.name,p.fee_name,p.fee_category,p.county||'',String(p.fdot_district||''),String(p.year||'')].join(' ').toLowerCase();
-      if(!txt.includes(q)) return false;
-    }
-    return true;
-  });
+  return ALL_FEATURES
+    .map((f, i) => ({ f, i }))
+    .filter(({ f }) => {
+      const p = f.properties;
+      if (!activeLayers[p.layer]) return false;
+      if (activeFilter !== 'all' && p.fee_category !== activeFilter) return false;
+      if (q) {
+        const txt = [p.name, p.fee_name, p.fee_category, p.county||'', String(p.fdot_district||''), String(p.year||'')].join(' ').toLowerCase();
+        if (!txt.includes(q)) return false;
+      }
+      return true;
+    });
 }
 
 function renderTable() {
-  let data = getVisible();
-  data.sort((a,b) => {
-    let av = a.properties[sortCol] ?? '', bv = b.properties[sortCol] ?? '';
-    if(typeof av==='string') av=av.toLowerCase();
-    if(typeof bv==='string') bv=bv.toLowerCase();
-    return sortDir==='asc' ? (av<bv?-1:av>bv?1:0) : (av>bv?-1:av<bv?1:0);
+  let visible = getVisible();
+  visible.sort((a, b) => {
+    let av = a.f.properties[sortCol] ?? '', bv = b.f.properties[sortCol] ?? '';
+    if (typeof av === 'string') av = av.toLowerCase();
+    if (typeof bv === 'string') bv = bv.toLowerCase();
+    return sortDir === 'asc' ? (av < bv ? -1 : av > bv ? 1 : 0) : (av > bv ? -1 : av < bv ? 1 : 0);
   });
 
-  const visibleIdx = new Set(data.map(f=>f._idx));
+  const visibleSet = new Set(visible.map(v => v.i));
 
-  // Update map visibility
-  layerMap.forEach(({geoLayer, feat}, idx) => {
-    const grp = feat.properties.layer==='county' ? countyGroup : cityGroup;
-    const shouldShow = visibleIdx.has(idx) && activeLayers[feat.properties.layer];
-    if(shouldShow && !grp.hasLayer(geoLayer)) grp.addLayer(geoLayer);
-    else if(!shouldShow && grp.hasLayer(geoLayer)) grp.removeLayer(geoLayer);
+  // Sync map visibility
+  layerMap.forEach(({ marker, feat }, idx) => {
+    const grp = feat.properties.layer === 'county' ? countyGroup : cityGroup;
+    const show = visibleSet.has(idx) && activeLayers[feat.properties.layer];
+    if (show && !grp.hasLayer(marker)) grp.addLayer(marker);
+    else if (!show && grp.hasLayer(marker)) grp.removeLayer(marker);
   });
 
-  document.getElementById('dbBody').innerHTML = data.map(f => {
+  document.getElementById('dbBody').innerHTML = visible.map(({ f, i }) => {
     const p = f.properties;
-    const catColor = p.fee_category==='Mobility Fee' ? '#2a9e06' : '#e6a817';
-    const layerBadge = p.layer==='county'
+    const catColor = p.fee_category === 'Mobility Fee' ? '#2a9e06' : '#e6a817';
+    const layerBadge = p.layer === 'county'
       ? '<span class="db-badge badge-county">County</span>'
       : '<span class="db-badge badge-city">City</span>';
-    const countyCol = p.layer==='city'
+    const countyCol = p.layer === 'city'
       ? (p.county ? p.county.charAt(0)+p.county.slice(1).toLowerCase() : '—')
       : `FDOT ${p.fdot_district}`;
     const schedCell = p.schedule_url
       ? `<a class="db-fee-link" href="${p.schedule_url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">View ↗</a>`
       : '<span style="color:var(--dark-border)">—</span>';
-    return `<tr data-idx="${f._idx}" onclick="onRowClick(${f._idx})">
+    return `<tr data-idx="${i}" onclick="onRowClick(${i})">
       <td class="col-name">${p.name}</td>
       <td>${layerBadge}</td>
       <td>${countyCol}</td>
       <td>${p.fee_name}</td>
       <td><span style="color:${catColor};font-size:0.82rem;font-weight:500">${p.fee_category}</span></td>
-      <td>${p.year||'—'}</td>
+      <td>${p.year || '—'}</td>
       <td>${schedCell}</td>
     </tr>`;
   }).join('');
 
   document.getElementById('dbCount').textContent =
-    `Showing ${data.length} of ${ALL_FEATURES.length} jurisdictions`;
+    `Showing ${visible.length} of ${ALL_FEATURES.length} jurisdictions`;
 }
 
 // ── Controls ───────────────────────────────────────────────────────
@@ -531,7 +507,7 @@ document.getElementById('dbSearch').addEventListener('input', renderTable);
 
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active','active-mob','active-imp'));
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active','active-mob','active-imp'));
     activeFilter = btn.dataset.cat;
     btn.classList.add(activeFilter==='Mobility Fee'?'active-mob':activeFilter==='Impact Fee'?'active-imp':'active');
     renderTable();
@@ -548,39 +524,45 @@ document.querySelectorAll('.layer-btn').forEach(btn => {
 
 document.querySelectorAll('.db-table th[data-col]').forEach(th => {
   th.addEventListener('click', () => {
-    const col = th.dataset.col;
-    sortDir = sortCol===col ? (sortDir==='asc'?'desc':'asc') : 'asc';
-    sortCol = col;
-    document.querySelectorAll('.db-table th').forEach(t=>t.classList.remove('sort-asc','sort-desc'));
+    sortDir = sortCol === th.dataset.col ? (sortDir==='asc'?'desc':'asc') : 'asc';
+    sortCol = th.dataset.col;
+    document.querySelectorAll('.db-table th').forEach(t => t.classList.remove('sort-asc','sort-desc'));
     th.classList.add(sortDir==='asc'?'sort-asc':'sort-desc');
     renderTable();
   });
 });
 
-// ── Load data via fetch ─────────────────────────────────────────────
+// ── Load data ──────────────────────────────────────────────────────
 async function loadData() {
+  const loader = document.getElementById('mapLoading');
   try {
-    const [countiesRes, citiesRes] = await Promise.all([
-      fetch('data/counties.geojson'),
-      fetch('data/cities.geojson')
-    ]);
-    const [countiesGJ, citiesGJ] = await Promise.all([
-      countiesRes.json(),
-      citiesRes.json()
-    ]);
+    loader.querySelector('p').textContent = 'Loading counties…';
+    const countiesRes = await fetch('data/counties.geojson');
+    if (!countiesRes.ok) throw new Error(`counties fetch failed: ${countiesRes.status}`);
+    const countiesGJ = await countiesRes.json();
+
+    loader.querySelector('p').textContent = 'Loading cities…';
+    const citiesRes = await fetch('data/cities.geojson');
+    if (!citiesRes.ok) throw new Error(`cities fetch failed: ${citiesRes.status}`);
+    const citiesGJ = await citiesRes.json();
+
     ALL_FEATURES = [...countiesGJ.features, ...citiesGJ.features];
-    addToMap(ALL_FEATURES);
+
+    // Add each feature with its true global index
+    ALL_FEATURES.forEach((feat, idx) => addFeature(feat, idx));
+
     renderTable();
-    document.getElementById('mapLoading').style.display = 'none';
+    loader.style.display = 'none';
+
   } catch(err) {
-    document.getElementById('mapLoading').innerHTML =
-      `<p style="color:var(--gray);font-family:var(--font-display);font-size:0.8rem;letter-spacing:0.1em;text-transform:uppercase;padding:2rem;text-align:center">
-        Map data unavailable.<br>Open this page from a web server or GitHub Pages.
-      </p>`;
+    console.error('Map load error:', err);
+    loader.innerHTML = `<div style="padding:2rem;text-align:center">
+      <p style="color:#e6a817;font-family:var(--font-display);font-size:0.85rem;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:0.5rem">Could not load map data</p>
+      <p style="color:var(--gray);font-size:0.82rem">This page must be served from a web server.<br>Use GitHub Pages, or run <code style="color:var(--green-glow)">python3 -m http.server</code> locally.</p>
+      <p style="color:#555;font-size:0.75rem;margin-top:0.5rem">${err.message}</p>
+    </div>`;
     document.getElementById('dbBody').innerHTML =
-      `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:2rem">
-        Table data unavailable — serve from a web server to load GeoJSON files.
-      </td></tr>`;
+      `<tr><td colspan="7" style="text-align:center;color:var(--gray);padding:2rem">Requires a web server to load — see map panel for details.</td></tr>`;
   }
 }
 
