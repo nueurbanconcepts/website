@@ -185,8 +185,7 @@ section{padding:6rem 0}
   border-radius: 2px;
 }
 .tag-completed { background: rgba(42,158,6,0.2);  color: #2a9e06; }
-.tag-progress  { background: rgba(230,168,23,0.2); color: #e6a817; }
-.tag-ongoing   { background: rgba(42,100,200,0.2); color: #6a9fe8; }
+.tag-active    { background: rgba(230,168,23,0.2); color: #e6a817; }
 .work-year {
   font-family: var(--font-display);
   font-size: 0.72rem;
@@ -284,13 +283,18 @@ section{padding:6rem 0}
   <div class="filter-bar">
     <button class="filter-btn active" data-filter="all">All Projects</button>
     <button class="filter-btn" data-filter="completed">Completed</button>
-    <button class="filter-btn" data-filter="progress">In Progress</button>
-    <button class="filter-btn" data-filter="ongoing">Ongoing</button>
+    <button class="filter-btn" data-filter="active">In Progress</button>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem">
+      <span style="font-family:var(--font-display);font-size:0.72rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--gray)">Sort:</span>
+      <button class="filter-btn sort-btn active" data-sort="newest">Newest First</button>
+      <button class="filter-btn sort-btn" data-sort="oldest">Oldest First</button>
+      <button class="filter-btn sort-btn" data-sort="az">A – Z</button>
+    </div>
   </div>
 
   <div class="work-grid" id="workGrid" style="margin-top:2rem">
 
-    <a class="work-card" href="files/palm-beach-gardens.pdf" target="_blank" rel="noopener" data-status="completed">
+    <a class="work-card" href="files/palm-beach-gardens.pdf" target="_blank" rel="noopener" data-status="completed" data-year="2025" data-title="City of Palm Beach Gardens">
       <div class="work-card-img-wrap">
         <img class="work-card-img" src="images/projects/palm-beach-gardens.jpg" alt="City of Palm Beach Gardens">
       </div>
@@ -300,12 +304,12 @@ section{padding:6rem 0}
           <span class="work-year">2025</span>
         </div>
         <div class="work-card-title">City of Palm Beach Gardens</div>
-        <div class="work-card-subtitle">Citywide Mobility Plan & Mobility Fee — Prime Consultant for a comprehensive 20-year multimodal transportation framework.</div>
+        <div class="work-card-subtitle">Citywide Mobility Plan &amp; Mobility Fee — Prime Consultant for a comprehensive 20-year multimodal transportation framework.</div>
         <span class="work-card-cta">View Project Sheet →</span>
       </div>
     </a>
 
-    <a class="work-card" href="files/alachua-county.pdf" target="_blank" rel="noopener" data-status="completed">
+    <a class="work-card" href="files/alachua-county.pdf" target="_blank" rel="noopener" data-status="completed" data-year="2023" data-title="Alachua County">
       <div class="work-card-img-wrap">
         <img class="work-card-img" src="images/projects/alachua-county.jpg" alt="Alachua County">
       </div>
@@ -320,13 +324,13 @@ section{padding:6rem 0}
       </div>
     </a>
 
-    <a class="work-card" href="files/port-st-lucie.pdf" target="_blank" rel="noopener" data-status="progress">
+    <a class="work-card" href="files/port-st-lucie.pdf" target="_blank" rel="noopener" data-status="active" data-year="2025" data-title="City of Port St. Lucie">
       <div class="work-card-img-wrap">
         <img class="work-card-img" src="images/projects/port-st-lucie.jpg" alt="City of Port St. Lucie">
       </div>
       <div class="work-card-body">
         <div class="work-card-meta">
-          <span class="work-tag tag-progress">In Progress</span>
+          <span class="work-tag tag-active">In Progress</span>
           <span class="work-year">2021–Present</span>
         </div>
         <div class="work-card-title">City of Port St. Lucie</div>
@@ -335,7 +339,7 @@ section{padding:6rem 0}
       </div>
     </a>
 
-    <a class="work-card" href="files/st-augustine.pdf" target="_blank" rel="noopener" data-status="completed">
+    <a class="work-card" href="files/st-augustine.pdf" target="_blank" rel="noopener" data-status="completed" data-year="2022" data-title="City of St. Augustine">
       <div class="work-card-img-wrap">
         <img class="work-card-img" src="images/projects/st-augustine.jpg" alt="City of St. Augustine">
       </div>
@@ -350,7 +354,7 @@ section{padding:6rem 0}
       </div>
     </a>
 
-    <a class="work-card" href="files/walton-county.pdf" target="_blank" rel="noopener" data-status="completed">
+    <a class="work-card" href="files/walton-county.pdf" target="_blank" rel="noopener" data-status="completed" data-year="2023" data-title="Walton County">
       <div class="work-card-img-wrap">
         <img class="work-card-img" src="images/projects/walton-county.jpg" alt="Walton County">
       </div>
@@ -365,7 +369,7 @@ section{padding:6rem 0}
       </div>
     </a>
 
-    <a class="work-card" href="files/oviedo.pdf" target="_blank" rel="noopener" data-status="completed">
+    <a class="work-card" href="files/oviedo.pdf" target="_blank" rel="noopener" data-status="completed" data-year="2025" data-title="City of Oviedo">
       <div class="work-card-img-wrap">
         <img class="work-card-img" src="images/projects/oviedo.jpg" alt="City of Oviedo">
       </div>
@@ -380,7 +384,7 @@ section{padding:6rem 0}
       </div>
     </a>
 
-    <a class="work-card" href="files/boynton-beach.pdf" target="_blank" rel="noopener" data-status="completed">
+    <a class="work-card" href="files/boynton-beach.pdf" target="_blank" rel="noopener" data-status="completed" data-year="2025" data-title="City of Boynton Beach">
       <div class="work-card-img-wrap">
         <img class="work-card-img" src="images/projects/boynton-beach.jpg" alt="City of Boynton Beach">
       </div>
@@ -395,7 +399,7 @@ section{padding:6rem 0}
       </div>
     </a>
 
-    <a class="work-card" href="files/north-miami.pdf" target="_blank" rel="noopener" data-status="completed">
+    <a class="work-card" href="files/north-miami.pdf" target="_blank" rel="noopener" data-status="completed" data-year="2024" data-title="City of North Miami">
       <div class="work-card-img-wrap">
         <img class="work-card-img" src="images/projects/north-miami.jpg" alt="City of North Miami">
       </div>
@@ -410,13 +414,13 @@ section{padding:6rem 0}
       </div>
     </a>
 
-    <a class="work-card" href="files/altamonte-springs.pdf" target="_blank" rel="noopener" data-status="ongoing">
+    <a class="work-card" href="files/altamonte-springs.pdf" target="_blank" rel="noopener" data-status="active" data-year="2024" data-title="City of Altamonte Springs">
       <div class="work-card-img-wrap">
         <img class="work-card-img" src="images/projects/altamonte-springs.jpg" alt="City of Altamonte Springs">
       </div>
       <div class="work-card-body">
         <div class="work-card-meta">
-          <span class="work-tag tag-ongoing">Ongoing</span>
+          <span class="work-tag tag-active">In Progress</span>
           <span class="work-year">2015, 2020, 2024</span>
         </div>
         <div class="work-card-title">City of Altamonte Springs</div>
@@ -473,17 +477,61 @@ section{padding:6rem 0}
   document.getElementById('year').textContent=new Date().getFullYear();
 });
 
-// Filter
-document.querySelectorAll('.filter-btn').forEach(btn => {
+// Filter + Sort
+let activeFilter = 'all';
+let activeSort = 'newest';
+
+function applyFilterSort() {
+  const grid = document.getElementById('workGrid');
+  const cards = [...grid.querySelectorAll('.work-card')];
+
+  // Sort
+  cards.sort((a, b) => {
+    if (activeSort === 'newest') return parseInt(b.dataset.year) - parseInt(a.dataset.year);
+    if (activeSort === 'oldest') return parseInt(a.dataset.year) - parseInt(b.dataset.year);
+    if (activeSort === 'az')     return a.dataset.title.localeCompare(b.dataset.title);
+    return 0;
+  });
+
+  // Active (in progress/ongoing) projects always float to top within their sort group
+  cards.sort((a, b) => {
+    const aActive = a.dataset.status === 'active' ? 0 : 1;
+    const bActive = b.dataset.status === 'active' ? 0 : 1;
+    if (aActive !== bActive) return aActive - bActive;
+    // Within same group, apply chosen sort
+    if (activeSort === 'newest') return parseInt(b.dataset.year) - parseInt(a.dataset.year);
+    if (activeSort === 'oldest') return parseInt(a.dataset.year) - parseInt(b.dataset.year);
+    if (activeSort === 'az')     return a.dataset.title.localeCompare(b.dataset.title);
+    return 0;
+  });
+
+  // Re-append in sorted order, apply visibility
+  cards.forEach(card => {
+    const show = activeFilter === 'all' || card.dataset.status === activeFilter;
+    card.style.display = show ? '' : 'none';
+    grid.appendChild(card);
+  });
+}
+
+document.querySelectorAll('.filter-btn:not(.sort-btn)').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.filter-btn:not(.sort-btn)').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    const filter = btn.dataset.filter;
-    document.querySelectorAll('.work-card').forEach(card => {
-      const show = filter === 'all' || card.dataset.status === filter;
-      card.style.display = show ? '' : 'none';
-    });
+    activeFilter = btn.dataset.filter;
+    applyFilterSort();
   });
 });
+
+document.querySelectorAll('.sort-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.sort-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    activeSort = btn.dataset.sort;
+    applyFilterSort();
+  });
+});
+
+// Apply default sort on load (newest first)
+applyFilterSort();
 </script>
 </body></html>
